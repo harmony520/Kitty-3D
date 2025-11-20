@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hello Kitty 3D</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Hello Kitty 3D Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Babel for in-browser compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       html, body, #root {
         width: 100%;
@@ -12,22 +14,226 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
+        background-color: #fbcfe8; /* fallback pink */
+        touch-action: none; /* Prevent mobile scroll refresh */
       }
     </style>
-  <script type="importmap">
+    <!-- 
+      IMPORT MAP CONFIGURATION
+      Strictly using React 18.2.0 to ensure compatibility with @react-three/fiber.
+    -->
+    <script type="importmap">
 {
   "imports": {
-    "@react-three/drei": "https://aistudiocdn.com/@react-three/drei@^10.7.7",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "three": "https://esm.sh/three@0.160.0",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.15.12?external=react,react-dom,three",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@9.99.0?external=react,react-dom,three,@react-three/fiber",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@react-three/fiber": "https://aistudiocdn.com/@react-three/fiber@^9.4.0",
-    "three": "https://aistudiocdn.com/three@^0.181.2"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
+    
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
+      import React, { useState, useRef, Suspense } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import * as THREE from 'three';
+      import { Canvas, useFrame } from '@react-three/fiber';
+      import { OrbitControls, Environment, Float, useProgress } from '@react-three/drei';
+
+      // --- Colors ---
+      const COLORS = {
+        fur: '#FFFFFF',
+        bow: '#EF4444', // Red-500
+        eyes: '#1F2937', // Gray-800
+        nose: '#FBBF24', // Amber-400
+        whiskers: '#1F2937'
+      };
+
+      // --- Components ---
+
+      const Whisker = ({ position, rotation }) => (
+        <mesh position={position} rotation={rotation} castShadow>
+          <capsuleGeometry args={[0.035, 0.55, 4, 8]} />
+          <meshStandardMaterial color={COLORS.whiskers} roughness={0.8} />
+        </mesh>
+      );
+
+      const HelloKitty = () => {
+        const groupRef = useRef(null);
+
+        // Gentle idle animation - Increased speed per request
+        useFrame((state) => {
+          if (groupRef.current) {
+            // Speed Multiplier increased: 0.5 -> 1.8 for faster sway
+            groupRef.current.rotation.y = Math.sin(state.clock.getElapsedTime() * 1.8) * 0.15;
+            groupRef.current.rotation.z = Math.sin(state.clock.getElapsedTime() * 1.2) * 0.03;
+          }
+        });
+
+        return (
+          <Float speed={3} rotationIntensity={0.15} floatIntensity={0.5}>
+            {/* Reduced scale from 0.9 to 0.6 to fit mobile screens safely */}
+            <group ref={groupRef} dispose={null} scale={0.6}>
+              
+              {/* HEAD: Wide Oblate Spheroid */}
+              <mesh position={[0, 0, 0]} scale={[1.8, 1.35, 1.3]} castShadow receiveShadow>
+                <sphereGeometry args={[1, 64, 64]} />
+                <meshStandardMaterial 
+                  color={COLORS.fur} 
+                  roughness={0.3} 
+                  metalness={0.1} 
+                />
+              </mesh>
+
+              {/* EARS: Spheres for round plush look */}
+              <mesh position={[-1.2, 0.9, -0.2]} rotation={[0, 0, 0.5]} scale={[0.5, 0.6, 0.4]} castShadow>
+                <sphereGeometry args={[1, 32, 32]} />
+                <meshStandardMaterial color={COLORS.fur} roughness={0.3} />
+              </mesh>
+              <mesh position={[1.2, 0.9, -0.2]} rotation={[0, 0, -0.5]} scale={[0.5, 0.6, 0.4]} castShadow>
+                <sphereGeometry args={[1, 32, 32]} />
+                <meshStandardMaterial color={COLORS.fur} roughness={0.3} />
+              </mesh>
+
+              {/* FACE DETAILS - Pushed forward to sit on the wide face */}
+              <group position={[0, -0.1, 1.28]}>
+                
+                {/* Eyes */}
+                <mesh position={[-0.75, 0, 0]} rotation={[0.1, -0.35, 0]}>
+                  <capsuleGeometry args={[0.12, 0.18, 4, 16]} />
+                  <meshStandardMaterial color={COLORS.eyes} roughness={0.2} metalness={0.6} />
+                </mesh>
+                <mesh position={[0.75, 0, 0]} rotation={[0.1, 0.35, 0]}>
+                  <capsuleGeometry args={[0.12, 0.18, 4, 16]} />
+                  <meshStandardMaterial color={COLORS.eyes} roughness={0.2} metalness={0.6} />
+                </mesh>
+
+                {/* Nose - Flattened oval */}
+                <mesh position={[0, -0.25, 0.08]} scale={[0.18, 0.12, 0.08]}>
+                  <sphereGeometry args={[1, 32, 32]} />
+                  <meshStandardMaterial color={COLORS.nose} roughness={0.3} metalness={0.2} />
+                </mesh>
+
+                {/* Whiskers */}
+                <group position={[-1.55, -0.1, -0.2]} rotation={[0, 0.5, 0.1]}>
+                   <Whisker position={[0, 0.22, 0]} rotation={[0, 0, 1.45]} />
+                   <Whisker position={[0, 0, 0]} rotation={[0, 0, 1.57]} />
+                   <Whisker position={[0, -0.22, 0]} rotation={[0, 0, 1.7]} />
+                </group>
+
+                <group position={[1.55, -0.1, -0.2]} rotation={[0, -0.5, -0.1]}>
+                   <Whisker position={[0, 0.22, 0]} rotation={[0, 0, -1.45]} />
+                   <Whisker position={[0, 0, 0]} rotation={[0, 0, -1.57]} />
+                   <Whisker position={[0, -0.22, 0]} rotation={[0, 0, -1.7]} />
+                </group>
+              </group>
+
+              {/* BOW */}
+              <group position={[1.1, 0.95, 0.6]} rotation={[0.2, -0.2, -0.4]} scale={1.1}>
+                <mesh position={[0, 0, 0]}>
+                  <sphereGeometry args={[0.24, 32, 32]} />
+                  <meshStandardMaterial color={COLORS.bow} roughness={0.3} metalness={0.2} />
+                </mesh>
+                <mesh position={[-0.38, 0, 0]} scale={[1.2, 1, 0.8]}>
+                   <sphereGeometry args={[0.28, 32, 32]} />
+                   <meshStandardMaterial color={COLORS.bow} roughness={0.3} metalness={0.2} />
+                </mesh>
+                <mesh position={[0.38, 0, 0]} scale={[1.2, 1, 0.8]}>
+                   <sphereGeometry args={[0.28, 32, 32]} />
+                   <meshStandardMaterial color={COLORS.bow} roughness={0.3} metalness={0.2} />
+                </mesh>
+              </group>
+
+            </group>
+          </Float>
+        );
+      };
+
+      const SceneSetup = () => {
+        return (
+          <>
+            <OrbitControls 
+              enablePan={false} 
+              minPolarAngle={Math.PI / 4} 
+              maxPolarAngle={Math.PI / 1.5}
+              minDistance={3}
+              maxDistance={10}
+            />
+
+            <ambientLight intensity={0.7} />
+            <spotLight 
+              position={[10, 10, 10]} 
+              angle={0.15} 
+              penumbra={1} 
+              intensity={1} 
+              castShadow 
+            />
+            <pointLight position={[-10, -10, -10]} intensity={0.5} color="pink" />
+
+            <Environment preset="city" />
+            
+            {/* Removed ContactShadows per request to prevent clipping and unwanted visuals */}
+          </>
+        );
+      };
+
+      const Loader = () => {
+        const { active, progress } = useProgress();
+        if (!active) return null;
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-pink-50/80 z-50 backdrop-blur-sm">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 border-4 border-pink-300 border-t-pink-500 rounded-full animate-spin mb-4"></div>
+              <div className="text-pink-500 font-bold text-lg">Loading Kitty {Math.round(progress)}%</div>
+            </div>
+          </div>
+        );
+      };
+
+      const App = () => {
+        return (
+          // Changed h-screen to h-[100dvh] for better mobile browser support
+          <div className="w-full h-[100dvh] bg-gradient-to-br from-pink-100 via-pink-200 to-rose-300 flex flex-col items-center justify-center relative overflow-hidden">
+            
+            {/* Decorative background */}
+            <div className="absolute top-10 left-10 w-32 h-32 bg-white/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute bottom-20 right-20 w-64 h-64 bg-pink-400/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Header Instruction Text */}
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-10 bg-white/40 backdrop-blur-md px-6 py-2 rounded-full border border-white/50 shadow-sm">
+              <p className="text-pink-600 text-sm font-medium tracking-wide whitespace-nowrap">
+                双指缩放，单指旋转
+              </p>
+            </div>
+
+            <div className="w-full h-full cursor-move">
+              <Canvas shadows camera={{ position: [0, 0, 6], fov: 50 }}>
+                <Suspense fallback={null}>
+                  <SceneSetup />
+                  <HelloKitty />
+                </Suspense>
+              </Canvas>
+            </div>
+
+            {/* Raised text position (bottom-20) on mobile to avoid overlap with browser UI */}
+            <div className="absolute bottom-20 md:bottom-8 pointer-events-none text-pink-800/50 font-sans text-sm font-medium tracking-widest uppercase z-10">
+              created by Mo
+            </div>
+            
+            <Loader />
+          </div>
+        );
+      };
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
   </body>
 </html>
